@@ -13,6 +13,8 @@ from difflib import SequenceMatcher
 import json
 import datetime
 import base64
+
+from pandas.core.config_init import pc_max_info_rows_doc
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium import *
 from selenium import webdriver
@@ -54,25 +56,48 @@ def measure_search_registry(driver, measure):
     apply_btn.click()
     time.sleep(0.5)
 
-def measure_patient_finder(driver, customer, lob, measure_name, domain_name, ws):
+def measure_patient_finder(driver, customer, lob, measure_name, measure_abb,domain_name, ws, wb):
     measure_link = ""
-    name_check = ""
-    domain_check = ""
-    pencil_check = ""
+    name_check = "NA"
+    domain_check = "NA"
+    pencil_check = "NA"
     pencil_icon_options = []
-    pencil_icon_details = ""
-    perf_check = ""
-    network_check = ""
-    comments = ""
-    flag = 0
+    pencil_icon_details = "NA"
+    perf_check = "NA"
+    network_check = "NA"
+    dashboard_map_check = "NA"
+    dashboard_pencil_check = "NA"
+    patient_link = "NA"
+    comments = "NA"
+    mspl_dashboard_check = ""
+    mspl_map_flag = 0
+    mspl_supp_flag = 0
+    dash_map_flag = 0
+    dash_supp_flag = 0
+    compliancy_details = "NA"
+    mspl_link = ""
     try:
-        measure_link = driver.find_element(By.XPATH, "//*[contains(text(),'"+measure_name+"')]//..//..//..//..").get_attribute('href')
+        #measure_link = driver.find_element(By.XPATH, "//*[contains(text(),'"+measure_abb+"')]//..//..//..//..").get_attribute('href')
+        try:
+            measure_link = driver.find_element(By.XPATH,
+                                               "//*[contains(text(),'" + measure_name + "')]//..//..//..//..").get_attribute(
+                'href')
+            print("Test....6")
+        except Exception as e:
+            split_text = measure_name.split("'", 1)
+            modified_text = split_text[1]
+            print("Test....7")
+            measure_link = driver.find_element(By.XPATH,
+                                               "//span[contains(text(),'" + modified_text + "')]//ancestor::a").get_attribute(
+                'href')
         driver.get(measure_link)
         ajax_preloader_wait(driver)
         WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.XPATH, "//*[@class='dataTables_info']")))
         measure_fullname = driver.find_element(By.XPATH,"//*[contains(@class,'metric_specific_patient_list_title')]").text
         measure_domain_ui = measure_fullname.split("|")[0]
         measure_name_ui = measure_fullname.split("|")[1]
+        print("Sheet: "+domain_name)
+        print("UI: "+measure_domain_ui)
         if measure_name in measure_name_ui:
             name_check = "Measure name successfully validated"
         else:
@@ -80,50 +105,82 @@ def measure_patient_finder(driver, customer, lob, measure_name, domain_name, ws)
         if domain_name in measure_domain_ui:
             domain_check = "Domain name successfully validated"
         else:
-            name_check = "Domain name discrepancy found"
-        elems = driver.find_element(By.XPATH, "//*[@id='metric-support-prov-ls']/tbody/tr[1]//td[5]").find_elements(By.TAG_NAME, 'a')
-        mspl_link = elems[0].get_attribute('href')
-        driver.get(mspl_link)
-        print("Opening MSPL...")
-        ajax_preloader_wait(driver)
-        WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.XPATH, "//*[@class='dataTables_info']")))
-        rows = driver.find_element(By.XPATH, "//*[@id='quality_registry_list']").find_element(By.TAG_NAME, 'tbody').find_elements(By.TAG_NAME, 'tr')
-        patient_link = rows[1].find_element(By.XPATH, "//*[contains(@class,'pat_name')]").get_attribute('href')
-        tab_param = driver.find_element(By.XPATH, "//*[@id='quality_registry']//ul[@class='tabs']").find_elements(By.TAG_NAME, 'li')
-        perf_check = tab_param[1].text
-        network_check = tab_param[2].text
+            domain_check = "Domain name discrepancy found"
         try:
-            print("Checking pencil icon availability...")
-            rows[1].find_element(By.XPATH, "//*[contains(@class,'addSuppData-trigger')]").click()
-            time.sleep(3)
-            pencil_icon_details = rows[1].find_element(By.XPATH, "//*[contains(@class,'addSuppData-trigger')]//..//ul").find_elements(By.TAG_NAME, 'li')
-            pencil_check = "Pencil icon available"
-            for detail in pencil_icon_details:
-                string = detail.text
-                pencil_icon_options.append(string)
-            pencil_icon_details = ", ".join(pencil_icon_options)
-        except Exception as e:
-            pencil_check = "Pencil icon not available"
-            pencil_icon_details = "Not applicable"
+            elems = driver.find_element(By.XPATH, "//*[@id='metric-support-prov-ls']/tbody/tr[1]//td[5]").find_elements(By.TAG_NAME, 'a')
+            mspl_link = elems[0].get_attribute('href')
+            driver.get(mspl_link)
+            print("Opening MSPL...")
+            ajax_preloader_wait(driver)
+            WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.XPATH, "//*[@class='dataTables_info']")))
+            driver.find_element(By.XPATH, "//*[@class='dt_tag_wrapper']//*[contains(@class,'dt_tag_close')]").click()
+            ajax_preloader_wait(driver)
+            WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.XPATH, "//*[@class='dataTables_info']")))
+            rows = driver.find_element(By.XPATH, "//*[@id='quality_registry_list']").find_element(By.TAG_NAME, 'tbody').find_elements(By.TAG_NAME, 'tr')
+            patient_link = rows[0].find_element(By.XPATH, "//*[contains(@class,'pat_name')]").get_attribute('href')
+            tab_param = driver.find_element(By.XPATH, "//*[@id='quality_registry']//ul[@class='tabs']").find_elements(By.TAG_NAME, 'li')
+            perf_check = tab_param[1].text
+            network_check = tab_param[2].text
+            try:
+                print("Checking pencil icon availability...")
+                rows[0].find_element(By.XPATH, "//*[contains(@class,'addSuppData-trigger')]").click()
+                time.sleep(3)
+                pencil_icon_details = rows[0].find_element(By.XPATH, "//*[contains(@class,'addSuppData-trigger')]//..//ul").find_elements(By.TAG_NAME, 'li')
+                pencil_check = "Pencil icon available"
+                for detail in pencil_icon_details:
+                    string = detail.text
+                    pencil_icon_options.append(string)
+                pencil_icon_details = ", ".join(pencil_icon_options)
+            except Exception as e:
+                pencil_check = "Pencil icon not available"
+                pencil_icon_details = "Not applicable"
+        except NoSuchElementException as e:
+            print(e)
+            print("No Providers Found, skipping check")
+            comments = "No Providers Found for the measure"
+            pencil_icon_details = "NA"
+            patient_link = "NA"
     except Exception as e:
-        print(e)
         print("Error occured!!!")
-    if "Add Supplemental Data" in pencil_icon_details:
-        flag = 1
+    if patient_link == "NA":
+        print("Skipping to next check...")
+        dashboard_check = "No dashboard to check"
     else:
-        comments = "No supplemental data, skipping code chcek"
-    ws.append([customer, lob, domain_check, name_check, perf_check, network_check, pencil_check, pencil_icon_details, comments])
-    return flag, patient_link
+        driver.get(patient_link)
+        ajax_preloader_wait(driver)
+        measure_name_dashboard = measure_name.replace("'","")
+        try:
+            driver.find_element(By.XPATH, "//*[contains(text(),'" + measure_name_dashboard + "')]//..//..//..//..//*[contains(@class,'pre_process_hcc')]")
+            dashboard_pencil_check = "Pencil icon available"
+            dash_supp_flag = 1
+        except NoSuchElementException as e:
+            dashboard_pencil_check = "Pencil icon not available"
+        try:
+            driver.find_element(By.XPATH, "//*[contains(text(),'" + measure_name_dashboard + "')]//..//..//..//..//*[@class='toggle_patient_metric_pending']")
+            dashboard_map_check = "MAP checkbox available"
+            dash_map_flag = 1
+        except NoSuchElementException as e:
+            dashboard_map_check = "MAP checkbox available"
+        try:
+            driver.find_element(By.XPATH, "//*[contains(text(),'"+measure_name+"')]//..//..//..//..//*[contains(@class,'non_compliant')]")
+            compliancy_details = "Compliant"
+        except NoSuchElementException as e:
+            compliancy_details = "Non-compliant"
+    if "Add Supplemental Data" in pencil_icon_details:
+        mspl_supp_flag = 1
+    else:
+        comments = comments + "| No supplemental data, skipping code check"
+    if "Mark as Pending" in pencil_icon_details:
+        mspl_map_flag = 1
+    if mspl_map_flag == dash_map_flag and mspl_supp_flag == dash_supp_flag:
+        mspl_dashboard_check = "MATCH"
+    else:
+        mspl_dashboard_check = "NOT MATCH"
+    ws.append([customer, lob, domain_check, name_check, perf_check, network_check, comments])
+    ws = wb["MSPL vs Dashboard Check"]
+    ws.append([customer, lob,compliancy_details, pencil_check, pencil_icon_details, dashboard_pencil_check, dashboard_map_check,mspl_dashboard_check, mspl_link])
+    return mspl_supp_flag
 
-
-        # for row in rows:
-        #     red_dot_info = row.find_elements(By.TAG_NAME, "td")[9].text
-        #     print(red_dot_info)
-        #     if "Non-compliant" in red_dot_info:
-        #         link = row.find_element(By.XPATH, "//*[contains(@class,'pat_name left')]").get_attribute('href')
-        #         driver.get(link)
-        #         ajax_preloader_wait(driver)
-        #         break
 
 def normalize(text):
     text = re.sub(r"\d+[-–]\d+", "", text)
@@ -152,6 +209,8 @@ def code_search_coding_tool(driver, customer, lob, measure_name, ws):
             if measure_name == measure_name_ui:
                 print("Matched metric: "+measure_name_ui)
                 driver.execute_script("arguments[0].scrollIntoView({block:'center', inline:'nearest'});",metric_rows[i])
+                driver.find_element(By.XPATH, "//*[@id='right_panel_nav_tabs']/li[1]/div").click()
+                time.sleep(1)
                 metric_rows[i].find_elements(By.XPATH, "//*[contains(@class,'add_more')]")[i].click()
                 time.sleep(2)
                 break
@@ -174,6 +233,7 @@ def code_search_coding_tool(driver, customer, lob, measure_name, ws):
         time.sleep(3)
         result_list = []
         try:
+            WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.XPATH, "//*[@class='advanced_search_btn']")))
             driver.find_element(By.XPATH, "//*[@class='advanced_search_btn']").click()
         except NoSuchElementException as e:
             ws.append([customer, lob,cz_id, measure_name, criteria, "No codes for criteria","NA","NA"])
@@ -208,12 +268,12 @@ def code_search_coding_tool(driver, customer, lob, measure_name, ws):
             except NoSuchElementException as e:
                 populated_result = "No Suggestions found for the searched code: " + str(code_id_value_list[0])
             status = get_status(code_id_value_list[0], result)
-            # try:
-            #     result = "\n ".join(result)
-            #     print(result)
-            #     populated_result = code_id_value_list[0]+" | "+code_id_value_list[1]
-            # except TypeError as e:
-            #     populated_result = "Check the result. Atleast one item empty."
+            try:
+                result = "\n ".join(result)
+                print(result)
+                populated_result = code_id_value_list[0]+" | "+code_id_value_list[1]
+            except TypeError as e:
+                populated_result = "Check the result. Atleast one item empty."
         except NoSuchElementException as e:
             result_list = "No suggestions found"
             populated_result = "NA"
@@ -301,7 +361,6 @@ if result == None:
 else:
     measure_abb = result["abbrev"]
     measure_name = result["measure"]
-    measure_domain = result["domain"]
     lob_cust_mapping = result["lob_customer_mapping"]
 
 
@@ -322,14 +381,17 @@ ws.append([
     "Measure Name check ",
     "Performance Statistics Score",
     "Network Comparison Score",
-    "Pencil icon check (MSPL)",
-    "Pencil icon options",
     "Comments"
 ])
-header_row = ws[1]
+format_excel_sheet(ws)
+wb.create_sheet("MSPL vs Dashboard Check")
+ws = wb["MSPL vs Dashboard Check"]
+ws.append(["Customer Name","LOB","Patient Compliancy","Pencil icon present in MSPL", "MSPL pencil icon options", "Dashboard Pencil icon present?","MAP Checkbox Present?","MSPL vs Dashboard values", "MSPL link"])
+format_excel_sheet(ws)
 wb.create_sheet("Code Search Validation")
 ws = wb["Code Search Validation"]
 ws.append(["Customer", "LOB Name", "Cozeva ID","Measure Name","Criteria Name", "Populated codes", "Search Result Populated", "Result Matched"])
+format_excel_sheet(ws)
 
 
 #chrome-setup
@@ -366,10 +428,12 @@ if driver.title != "Registries | Cozeva":
 ajax_preloader_wait(driver)
 registry_url = driver.current_url
 print("Starting validaton of measure: "+measure_abb)
+measure_domain = "NA"
 for record in lob_cust_mapping:
     lob = record["lob"]
     customer_name = record["customer"]
     customer_id = record["customer_id"]
+    measure_domain = record["domain"]
     measure_year = "2026"
     print("Checking "+measure_abb+" for "+customer_name+" in "+lob+" of MY2026")
     link = url_navigator(customer_id, base_url, registry_url)
@@ -383,21 +447,24 @@ for record in lob_cust_mapping:
             year.click()
     LOB_list = driver.find_element(By.XPATH, "//*[@id='filter-lob']").find_elements(By.TAG_NAME, 'li')
     for LOB in LOB_list:
-        if lob in LOB.text:
-            LOB.click()
-            break
+        if "All" in lob:
+            if lob in LOB.text:
+                LOB.click()
+                break
+        else:
+            if lob == LOB.text:
+                LOB.click()
+                break
     time.sleep(1)
     driver.find_element(By.XPATH, "//*[@id='reg-filter-apply']").click()
     ajax_preloader_wait(driver)
     ws = wb[sheet_name]
     try:
         measure_search_registry(driver, measure_name)
-        [code_check_flag, patient_link] = measure_patient_finder(driver, customer_name, lob, measure_name, measure_domain, ws)
+        code_check_flag = measure_patient_finder(driver, customer_name, lob, measure_name, measure_abb, measure_domain, ws, wb)
         wb.save(path1+filename)
         if code_check_flag == 1:
             print("Supplemental data can be added, proceeding to code search...")
-            driver.get(patient_link)
-            ajax_preloader_wait(driver)
             supplemental_data_launcher(driver)
             ws = wb["Code Search Validation"]
             code_search_coding_tool(driver, customer_name, lob, measure_name, ws)
@@ -414,35 +481,9 @@ for record in lob_cust_mapping:
             print("No pencil icon available, skipping to next LOB")
     except Exception as e:
         print(e)
-# for measure in measure_list:
-#     measure = measure.upper()
-#     print(measure)
-#     measure_search_registry(driver, measure)
-#     measure_fullname = measure_patient_finder(driver, measure)
-#     if measure_fullname != "nan":
-#         coding_tool_btn = driver.find_element(By.XPATH, "//*[contains(text(),'Add Supplemental Data')]")
-#         driver.execute_script("arguments[0].scrollIntoView({block:'center', inline:'nearest'});", coding_tool_btn)
-#         coding_tool_btn.click()
-#         ajax_preloader_wait(driver)
-#         WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.XPATH, "//*[contains(@class,'task_def')]")))
-#         code_search_coding_tool(driver, lob, measure_fullname, keywords_list, ws)
-#         format_excel_sheet(ws)
-#         wb.save(path1 + filename)
-#         driver.find_element(By.XPATH, "//*[@class='asf_header']//*[contains(text(),'clear')]").click()
-#         driver.find_element(By.XPATH, "//*[@id='chart_action_82']").click()
-#         driver.find_element(By.XPATH, "//*[@id='task_delete_input']").send_keys("CozevaQA")
-#         driver.find_element(By.XPATH, "//*[@data-index='confirm']").click()
-#         time.sleep(1)
-#         ajax_preloader_wait(driver)
-#     else:
-#         print("Skipping the input: "+measure)
-#     driver.get(registry_url)
-#     ajax_preloader_wait(driver)
 
 driver.close()
 
 
-# Patient Dashboard MAP checkbox check, MSPL vs dashboard options validation
 # Multiple code search button
-# disable non selected LOBs drodown in codecheckui.py
 # Phase 2: MSPL column blank check, Relevant care history check, Submission of data in Simulated Customer
