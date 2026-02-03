@@ -69,7 +69,8 @@ def measure_patient_finder(driver, customer, lob, measure_name, measure_abb,doma
     dashboard_pencil_check = "NA"
     patient_link = "NA"
     comments = "NA"
-    mspl_dashboard_check = ""
+    mspl_dashboard_map_check = ""
+    mspl_dashboard_pencil_check = ""
     mspl_map_flag = 0
     mspl_supp_flag = 0
     dash_map_flag = 0
@@ -172,16 +173,25 @@ def measure_patient_finder(driver, customer, lob, measure_name, measure_abb,doma
         comments = comments + "| No supplemental data, skipping code check"
     if "Mark as Pending" in pencil_icon_details:
         mspl_map_flag = 1
-    if mspl_map_flag == dash_map_flag and mspl_supp_flag == dash_supp_flag:
-        mspl_dashboard_check = "MATCH"
+    if mspl_map_flag == "NA" and dash_map_flag == "NA":
+        mspl_dashboard_map_check = "NA"
+    elif mspl_map_flag == dash_map_flag:
+        mspl_dashboard_map_check = "MATCHED"
     else:
-        mspl_dashboard_check = "NOT MATCH"
+        mspl_dashboard_map_check = "NOT MATCHED"
+    if mspl_supp_flag == "NA" and dash_supp_flag == "NA":
+        mspl_dashboard_pencil_check = "NA"
+    elif mspl_supp_flag == dash_supp_flag:
+        mspl_dashboard_pencil_check = "MATCHED"
+    else:
+        mspl_dashboard_pencil_check = "NOT MATCHED"
+
     ws.append([customer, lob, domain_check, name_check, perf_check, network_check, comments])
+    format_excel_sheet(ws)
     ws = wb["MSPL vs Dashboard Check"]
-    ws.append([customer, lob,compliancy_details, pencil_check, pencil_icon_details, dashboard_pencil_check, dashboard_map_check,mspl_dashboard_check, mspl_link])
+    ws.append([customer, lob,compliancy_details, pencil_check, pencil_icon_details, dashboard_pencil_check, dashboard_map_check,mspl_dashboard_map_check, mspl_dashboard_pencil_check, mspl_link])
+    format_excel_sheet(ws)
     return mspl_supp_flag
-
-
 def normalize(text):
     text = re.sub(r"\d+[-–]\d+", "", text)
     text = " ".join(text.lower().split())
@@ -295,9 +305,9 @@ def get_status(searched_value, returned_result_array):
     for item in returned_result_array:
         r = str(item).strip().lower()
         if s in r:
-            return "MATCH"
+            return "MATCHED"
 
-    return "NO MATCH"
+    return "NO MATCHED"
 
 
 def format_excel_sheet(ws):
@@ -330,11 +340,11 @@ def format_excel_sheet(ws):
     for row in range(2, max_row + 1):
         status_cell = ws.cell(row=row, column=8)
 
-        if status_cell.value == "MATCH":
+        if status_cell.value == "MATCHED" or "Successfully validated" in status_cell.value:
             status_cell.fill = PatternFill("solid", fgColor="C6EFCE")   # Green
-        elif status_cell.value == "NO MATCH":
+        elif status_cell.value == "NO MATCHED":
             status_cell.fill = PatternFill("solid", fgColor="F4CCCC")  # Red
-        elif status_cell.value == "Empty Return Set":
+        elif status_cell.value == "NA":
             status_cell.fill = PatternFill("solid", fgColor="FFFFCC")  # Yellow
 
 def url_navigator(cust_id, base_url, main_url):
@@ -386,7 +396,7 @@ ws.append([
 format_excel_sheet(ws)
 wb.create_sheet("MSPL vs Dashboard Check")
 ws = wb["MSPL vs Dashboard Check"]
-ws.append(["Customer Name","LOB","Patient Compliancy","Pencil icon present in MSPL", "MSPL pencil icon options", "Dashboard Pencil icon present?","MAP Checkbox Present?","MSPL vs Dashboard values", "MSPL link"])
+ws.append(["Customer Name","LOB","Patient Compliancy","Pencil icon present in MSPL", "MSPL pencil icon options", "Dashboard Pencil icon present?","MAP Checkbox Present?","MSPL vs Dashboard MAP","MSPL vs Dashboard Pencil", "MSPL link"])
 format_excel_sheet(ws)
 wb.create_sheet("Code Search Validation")
 ws = wb["Code Search Validation"]
