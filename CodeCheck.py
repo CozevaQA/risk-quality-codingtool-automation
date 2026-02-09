@@ -352,7 +352,7 @@ def format_excel_sheet(ws):
     for row in range(2, max_row + 1):
         status_cell = ws.cell(row=row, column=8)
 
-        if status_cell.value == "MATCHED" or "Successfully validated" in status_cell.value:
+        if status_cell.value == "MATCHED":
             status_cell.fill = PatternFill("solid", fgColor="C6EFCE")  # Green
         elif status_cell.value == "NO MATCHED":
             status_cell.fill = PatternFill("solid", fgColor="F4CCCC")  # Red
@@ -530,3 +530,4 @@ driver.close()
 
 # Phase 2: MSPL column blank check, Relevant care history check, Submission of data in Simulated Customer
 # Close Filter if pre applied
+
