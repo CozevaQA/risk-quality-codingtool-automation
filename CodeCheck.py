@@ -50,7 +50,7 @@ def measure_search_registry(driver, measure, abb):
     time.sleep(0.5)
     driver.find_element(By.XPATH, "//*[@id='qt-reg-nav-filters']/li[1]/label").click()
     time.sleep(0.5)
-    driver.find_element(By.XPATH, "//*[@id='qt-search-met']").send_keys(abb)
+    driver.find_element(By.XPATH, "//*[@id='qt-search-met']").send_keys(measure)
     apply_btn = driver.find_element(By.XPATH, "//button[@id='qt-apply-search']")
     driver.execute_script("arguments[0].scrollIntoView();", apply_btn)
     apply_btn.click()
@@ -78,19 +78,19 @@ def measure_patient_finder(driver, customer, lob, measure_name, measure_abb,doma
     compliancy_details = "NA"
     mspl_link = ""
     try:
-        measure_link = driver.find_element(By.XPATH, "//*[contains(text(),'"+measure_abb+"')]//..//..//..//..").get_attribute('href')
-        # try:
-        #     measure_link = driver.find_element(By.XPATH,
-        #                                        "//*[contains(text(),'" + measure_name + "')]//..//..//..//..").get_attribute(
-        #         'href')
-        #     print("Test....6")
-        # except Exception as e:
-        #     split_text = measure_name.split("'", 1)
-        #     modified_text = split_text[1]
-        #     print("Test....7")
-        #     measure_link = driver.find_element(By.XPATH,
-        #                                        "//span[contains(text(),'" + modified_text + "')]//ancestor::a").get_attribute(
-        #         'href')
+        #measure_link = driver.find_element(By.XPATH, "//*[contains(text(),'"+measure_abb+"')]//..//..//..//..").get_attribute('href')
+        try:
+            measure_link = driver.find_element(By.XPATH,
+                                               "//*[contains(text(),'" + measure_name + "')]//..//..//..//..").get_attribute(
+                'href')
+            print("Test....6")
+        except Exception as e:
+            split_text = measure_name.split("'", 1)
+            modified_text = split_text[1]
+            print("Test....7")
+            measure_link = driver.find_element(By.XPATH,
+                                               "//span[contains(text(),'" + modified_text + "')]//ancestor::a").get_attribute(
+                'href')
         driver.get(measure_link)
         ajax_preloader_wait(driver)
         WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.XPATH, "//*[@class='dataTables_info']")))
@@ -393,7 +393,6 @@ if result == None:
     sys.exit(0)
 else:
     measure_abb = result["abbrev"]
-    measure_name = result["measure"]
     lob_cust_mapping = result["lob_customer_mapping"]
 
 
@@ -478,6 +477,7 @@ for record in lob_cust_mapping:
     customer_name = record["customer"]
     customer_id = record["customer_id"]
     measure_domain = record["domain"]
+    measure_name = record["measure"]
     measure_year = "2026"
     print("Checking "+measure_abb+" for "+customer_name+" in "+lob+" of MY2026")
     link = url_navigator(customer_id, base_url, registry_url)
@@ -530,4 +530,5 @@ driver.close()
 
 # Phase 2: MSPL column blank check, Relevant care history check, Submission of data in Simulated Customer
 # Close Filter if pre applied
+
 
