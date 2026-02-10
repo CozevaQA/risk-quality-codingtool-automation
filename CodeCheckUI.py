@@ -34,12 +34,11 @@ def launch_measure_selector():
 
     root = tk.Tk()
     root.title("Measure Verification MY2026")
-    root.geometry("900x750")
+    root.geometry("900x725")
     root.configure(bg=BG_COLOR)
     root.resizable(False, False)
 
     abbrev_var = tk.StringVar()
-
     lob_customer_widgets = []
 
     # ---------- HELPERS ----------
@@ -53,6 +52,11 @@ def launch_measure_selector():
         abbrev_combo["values"] = [
             a for a in ALL_ABBREV if typed in a.lower()
         ] if typed else ALL_ABBREV
+
+    def auto_resize_measure_box():
+        lines = int(measure_text.index("end-1c").split(".")[0])
+        new_height = max(2, min(lines, 6))
+        measure_text.configure(height=new_height)
 
     def on_abbrev_selected(event=None):
         clear_lob_rows()
@@ -69,11 +73,11 @@ def launch_measure_selector():
             measure_text.config(state="disabled")
             return
 
-        # Show measure name at the TOP (single, consistent)
         measure_text.config(state="normal")
         measure_text.delete("1.0", tk.END)
         measure_text.insert(tk.END, str(subset.iloc[0]["measure"]))
         measure_text.config(state="disabled")
+        auto_resize_measure_box()
 
         valid_subset = subset[subset["denominator"] != 0]
 
@@ -90,6 +94,7 @@ def launch_measure_selector():
             create_lob_customer_row(idx, lob, valid_subset)
 
         lob_canvas.yview_moveto(0)
+        lob_canvas.xview_moveto(0)
 
     def create_lob_customer_row(row_index, lob, valid_subset):
 
@@ -100,18 +105,16 @@ def launch_measure_selector():
 
         lob_rows = valid_subset[valid_subset["lob"].astype(str) == lob]
 
-        # Build customer → metadata mapping
         customer_meta_map = {}
         for _, r in lob_rows.iterrows():
             customer_meta_map.setdefault(str(r["customer"]), {
                 "customer_id": str(r["customer id"]),
+                "measure": str(r["measure"]),
                 "domain": str(r["domain"])
             })
 
         customers = sorted(customer_meta_map.keys())
         cust_var = tk.StringVar(value=customers[0] if customers else "")
-
-        # ----- UI WIDGETS PER ROW -----
 
         chk = tk.Checkbutton(
             frame,
@@ -122,7 +125,7 @@ def launch_measure_selector():
             selectcolor="white",
             activebackground=BG_COLOR,
             font=("Arial", 10, "bold"),
-            width=22,
+            width=20,
             anchor="w"
         )
         chk.grid(row=0, column=0, padx=(0, 10), sticky="w")
@@ -131,10 +134,22 @@ def launch_measure_selector():
             frame,
             textvariable=cust_var,
             state="readonly",
-            width=40,
+            width=32,
             values=customers
         )
         cust_combo.grid(row=0, column=1, padx=(0, 10))
+
+        measure_label = tk.Label(
+            frame,
+            text="",
+            bg="white",
+            fg="black",
+            font=("Arial", 10, "bold"),
+            anchor="w",
+            width=55,
+            wraplength=420
+        )
+        measure_label.grid(row=0, column=2, padx=(0, 10), sticky="w")
 
         domain_label = tk.Label(
             frame,
@@ -143,25 +158,27 @@ def launch_measure_selector():
             fg="black",
             font=("Arial", 10, "bold"),
             anchor="w",
-            width=40
+            width=30
         )
-        domain_label.grid(row=0, column=2, sticky="w")
+        domain_label.grid(row=0, column=3, sticky="w")
 
-        def update_domain_label(*args):
+        def update_labels(*args):
             cust = cust_var.get()
             meta = customer_meta_map.get(cust, {})
+            measure_label.config(text=f"Measure: {meta.get('measure','')}")
             domain_label.config(text=f"Domain: {meta.get('domain','')}")
 
         def toggle_row():
             if selected_var.get():
                 cust_combo.configure(state="readonly")
-                update_domain_label()
+                update_labels()
             else:
                 cust_combo.configure(state="disabled")
+                measure_label.config(text="")
                 domain_label.config(text="")
 
         selected_var.trace_add("write", lambda *a: toggle_row())
-        cust_var.trace_add("write", lambda *a: update_domain_label())
+        cust_var.trace_add("write", lambda *a: update_labels())
 
         toggle_row()
 
@@ -192,7 +209,6 @@ def launch_measure_selector():
             messagebox.showwarning("Validation Error", "Select at least one LOB.")
             return
 
-        # Extract single measure name from top text box
         measure_name = measure_text.get("1.0", tk.END).strip()
 
         lob_results = []
@@ -204,12 +220,12 @@ def launch_measure_selector():
                 "lob": row["lob"],
                 "customer": cust,
                 "customer_id": meta.get("customer_id"),
+                "measure": meta.get("measure"),
                 "domain": meta.get("domain")
             })
 
         result_holder["result"] = {
             "abbrev": abbrev_var.get(),
-            "measure": measure_name,          # SINGLE measure throughout
             "lob_customer_mapping": lob_results
         }
 
@@ -228,27 +244,31 @@ def launch_measure_selector():
     main_frame.pack(fill="both", expand=True)
     main_frame.grid_columnconfigure(1, weight=1)
 
-    # ----- MEASURE ABBREV -----
     tk.Label(main_frame, text="Measure Abbreviation",
              bg=BG_COLOR, fg="white", font=("Arial", 11, "bold"))\
         .grid(row=0, column=0, sticky="w", pady=6)
 
     abbrev_combo = ttk.Combobox(
-        main_frame, textvariable=abbrev_var, width=55, values=ALL_ABBREV
+        main_frame, textvariable=abbrev_var, width=60, values=ALL_ABBREV
     )
     abbrev_combo.grid(row=0, column=1, sticky="w")
     abbrev_combo.bind("<KeyRelease>", filter_abbrev)
     abbrev_combo.bind("<<ComboboxSelected>>", on_abbrev_selected)
 
-    # ----- MEASURE NAME AT TOP -----
     tk.Label(main_frame, text="Measure Name",
              bg=BG_COLOR, fg="white", font=("Arial", 11, "bold"))\
         .grid(row=1, column=0, sticky="nw", pady=6)
 
-    measure_text = tk.Text(main_frame, height=2, width=90, wrap="word", state="disabled", font=("Arial",10,"bold"))
+    measure_text = tk.Text(
+        main_frame,
+        height=2,
+        width=95,
+        wrap="word",
+        state="disabled",
+        font=("Arial", 10, "bold")
+    )
     measure_text.grid(row=1, column=1, sticky="w")
 
-    # ----- HEADER + BUTTONS -----
     tk.Label(main_frame,
              text="Select LOBs to Execute (Non-zero Denominators)",
              bg=BG_COLOR, fg="white", font=("Arial", 12, "bold"))\
@@ -262,35 +282,44 @@ def launch_measure_selector():
     ttk.Button(action_frame, text="Deselect All", command=deselect_all_lobs)\
         .pack(side="left")
 
-    # ----- SCROLLABLE LOB LIST -----
-    lob_canvas = tk.Canvas(main_frame, bg=BG_COLOR, height=520, highlightthickness=0)
+    # ─────────────────────────────────────────────
+    # SCROLLABLE LOB CONTAINER (VERTICAL + HORIZONTAL)
+    # ─────────────────────────────────────────────
+    lob_canvas = tk.Canvas(main_frame, bg=BG_COLOR, height=500, highlightthickness=0)
     lob_canvas.grid(row=3, column=0, columnspan=2, sticky="nsew")
 
-    scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=lob_canvas.yview)
-    scrollbar.grid(row=3, column=2, sticky="ns")
+    v_scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=lob_canvas.yview)
+    v_scrollbar.grid(row=3, column=2, sticky="ns")
 
-    lob_canvas.configure(yscrollcommand=scrollbar.set)
+    h_scrollbar = ttk.Scrollbar(main_frame, orient="horizontal", command=lob_canvas.xview)
+    h_scrollbar.grid(row=4, column=0, columnspan=2, sticky="ew")
+
+    lob_canvas.configure(
+        yscrollcommand=v_scrollbar.set,
+        xscrollcommand=h_scrollbar.set
+    )
 
     lob_container = tk.Frame(lob_canvas, bg=BG_COLOR)
     lob_window = lob_canvas.create_window((0, 0), window=lob_container, anchor="nw")
 
-    lob_container.bind(
-        "<Configure>",
-        lambda e: lob_canvas.configure(scrollregion=lob_canvas.bbox("all"))
-    )
-    lob_canvas.bind(
-        "<Configure>",
-        lambda e: lob_canvas.itemconfig(lob_window, width=e.width)
-    )
+    def _on_frame_configure(event):
+        lob_canvas.configure(scrollregion=lob_canvas.bbox("all"))
+
+    lob_container.bind("<Configure>", _on_frame_configure)
 
     lob_canvas.bind_all(
         "<MouseWheel>",
         lambda e: lob_canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
     )
 
-    # ----- BUTTONS -----
+    def _on_shift_mousewheel(event):
+        lob_canvas.xview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    lob_canvas.bind_all("<Shift-MouseWheel>", _on_shift_mousewheel)
+
+    # Buttons
     btn_frame = tk.Frame(main_frame, bg=BG_COLOR)
-    btn_frame.grid(row=4, column=0, columnspan=2, pady=20)
+    btn_frame.grid(row=5, column=0, columnspan=2, pady=20)
 
     ttk.Button(btn_frame, text="Cancel", command=on_cancel)\
         .pack(side="right", padx=10)
@@ -306,4 +335,3 @@ if __name__ == "__main__":
     result = launch_measure_selector()
     print("Returned Result:")
     print(result)
-
