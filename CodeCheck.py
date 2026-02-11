@@ -502,6 +502,19 @@ for record in lob_cust_mapping:
     time.sleep(1)
     driver.find_element(By.XPATH, "//*[@id='reg-filter-apply']").click()
     ajax_preloader_wait(driver)
+    checkbox = driver.find_element(By.ID, "conti_enroll")
+    if checkbox.is_selected():
+        print("CE toggled on, switching off")
+        checkbox.click()
+    else:
+        print("CE Off")
+    try:
+        filter_indicator = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.filter-indicator")))
+        close_btn = filter_indicator.find_element(By.CSS_SELECTOR, "span.mdi-close")
+        close_btn.click()
+        print("Filter was applied..Closing it")
+    except Exception as e:
+        print("No active filter indicator found")
     ws = wb[sheet_name]
     try:
         measure_search_registry(driver, measure_name, measure_abb)
@@ -530,5 +543,6 @@ driver.close()
 
 # Phase 2: MSPL column blank check, Relevant care history check, Submission of data in Simulated Customer
 # Close Filter if pre applied
+
 
 
