@@ -172,7 +172,7 @@ def measure_patient_finder(driver, customer, lob, measure_name, measure_abb,doma
             dashboard_map_check = "MAP checkbox available"
             dash_map_flag = 1
         except NoSuchElementException as e:
-            dashboard_map_check = "MAP checkbox available"
+            dashboard_map_check = "MAP checkbox not available"
         try:
             driver.find_element(By.XPATH, "//*[contains(text(),'"+measure_name+"')]//..//..//..//..//*[contains(@class,'non_compliant')]")
             compliancy_details = "Non-compliant"
@@ -542,6 +542,7 @@ driver.close()
 
 # Phase 2: MSPL column blank check, Relevant care history check, Submission of data in Simulated Customer
 # Close Filter if pre applied
+
 
 
 
