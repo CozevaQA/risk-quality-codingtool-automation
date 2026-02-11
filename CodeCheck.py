@@ -502,10 +502,9 @@ for record in lob_cust_mapping:
     time.sleep(1)
     driver.find_element(By.XPATH, "//*[@id='reg-filter-apply']").click()
     ajax_preloader_wait(driver)
-    checkbox = driver.find_element(By.ID, "conti_enroll")
-    if checkbox.is_selected():
+    if driver.find_element(By.XPATH, "//*[@id='conti_enroll']").is_selected():
         print("CE toggled on, switching off")
-        checkbox.click()
+        driver.find_element(By.XPATH, "//*[@class='cont_disc_toggle']").click()
     else:
         print("CE Off")
     try:
@@ -543,6 +542,7 @@ driver.close()
 
 # Phase 2: MSPL column blank check, Relevant care history check, Submission of data in Simulated Customer
 # Close Filter if pre applied
+
 
 
 
