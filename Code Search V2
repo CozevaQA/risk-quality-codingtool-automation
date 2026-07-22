@@ -1,0 +1,893 @@
+"""
+CodeChecker 2 – Measure validation automation for Cozeva Registries.
+
+Flow:
+  1. Launch measure selector UI (CodeCheckUI)
+  2. Login and navigate Registries per customer/LOB
+  3. Validate measure navigation, MSPL vs Dashboard, and code search
+  4. Write results to an Excel report
+"""
+
+import os
+import sys
+import time
+import traceback
+import datetime
+import base64
+import re
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.webdriver.support.wait import WebDriverWait
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill
+from openpyxl.utils import get_column_letter
+from urllib.parse import urlparse, parse_qs
+
+from CodeCheckUI import launch_measure_selector
+
+
+# =============================================================================
+# XPATH / LOCATOR SECTION  (keep all UI selectors here for easy maintenance)
+# =============================================================================
+
+# --- Registry filters & search ---
+XP_REG_FILTER_TOGGLE = "//a[@data-target='qt-reg-nav-filters']"
+XP_REG_FILTER_FIRST_LABEL = "//*[@id='qt-reg-nav-filters']/li[1]/label"
+XP_REG_SEARCH_INPUT = "//*[@id='qt-search-met']"
+XP_REG_APPLY_SEARCH = "//button[@id='qt-apply-search']"
+XP_QT_FILTER_LABEL = "//*[@id='qt-filter-label']"
+XP_FILTER_QUARTER = "//*[@id='filter-quarter']"
+XP_FILTER_LOB = "//*[@id='filter-lob']"
+XP_REG_FILTER_APPLY = "//*[@id='reg-filter-apply']"
+XP_CONTI_ENROLL = "//*[@id='conti_enroll']"
+XP_CONT_DISC_TOGGLE = "//*[@class='cont_disc_toggle']"
+
+# --- App navigation ---
+XP_APP_DROPDOWN = "//*[@data-target='app_dropdown']"
+XP_APP_REGISTRIES = "//*[@class='no-hover app_registries']"
+
+# --- Measure / MSPL ---
+# Dynamic: measure name is injected at runtime
+def xp_measure_link_by_name(measure_name):
+    return f"//*[contains(text(),'{measure_name}')]//..//..//..//.."
+
+
+def xp_measure_link_by_span(modified_text):
+    return f"//span[contains(text(),'{modified_text}')]//ancestor::a"
+
+
+XP_DATATABLES_INFO = "//*[@class='dataTables_info']"
+XP_MSPL_TITLE = "//*[contains(@class,'metric_specific_patient_list_title')]"
+XP_PROVIDER_FIRST_LINK_CELL = "//*[@id='metric-support-prov-ls']/tbody/tr[1]//td[5]"
+XP_QUALITY_REGISTRY_LIST = "//*[@id='quality_registry_list']"
+XP_PAT_NAME = "//*[contains(@class,'pat_name')]"
+XP_DT_TAG_CLOSE = "//*[@class='dt_tag_wrapper']//*[contains(@class,'dt_tag_close')]"
+XP_QUALITY_REGISTRY_TABS = "//*[@id='quality_registry']//ul[@class='tabs']"
+XP_ADD_SUPP_TRIGGER = "//*[contains(@class,'addSuppData-trigger')]"
+XP_ADD_SUPP_MENU = "//*[contains(@class,'addSuppData-trigger')]//..//ul"
+XP_ADD_SUPPLEMENTAL_DATA = "//*[contains(text(),'Add Supplemental Data')]"
+
+# --- Patient dashboard (dynamic measure name) ---
+def xp_dashboard_pencil(measure_name):
+    return (
+        f"//*[contains(text(),'{measure_name}')]//..//..//..//.."
+        f"//*[contains(@class,'pre_process_hcc')]"
+    )
+
+
+def xp_dashboard_map(measure_name):
+    return (
+        f"//*[contains(text(),'{measure_name}')]//..//..//..//.."
+        f"//*[@class='toggle_patient_metric_pending']"
+    )
+
+
+def xp_dashboard_non_compliant(measure_name):
+    return (
+        f"//*[contains(text(),'{measure_name}')]//..//..//..//.."
+        f"//*[contains(@class,'non_compliant')]"
+    )
+
+
+# --- Coding tool / code search ---
+XP_TASK_DEF = "//*[contains(@class,'task_def')]"
+XP_PATIENT_COZEVA_ID = "//*[contains(@class,'patient_cozeva_id')]"
+XP_METRIC_ROWS = "//*[@class='metric']"
+# Relative to a metric row element (use with element.find_element)
+XP_MET_NAME_REL = ".//*[contains(@class,'met-name')]"
+XP_ADD_MORE_REL = ".//*[contains(@class,'add_more')]"
+XP_RIGHT_PANEL_FIRST_TAB = "//*[@id='right_panel_nav_tabs']/li[1]/div"
+XP_CHOICE_SELECT_WRAPPER = (
+    "//*[contains(@class,'choice_tr')]//*[@class='choice_option']//*[@class='select-wrapper']"
+)
+XP_CHOICE_OPTIONS_LI = (
+    "//*[contains(@class,'choice_tr')]//*[@class='choice_option']//ul/li"
+)
+XP_ADVANCED_SEARCH_BTN = "//*[@class='advanced_search_btn']"
+XP_CODE_UL_LI = "//*[@id='code_ul']/li"
+XP_ASF_CLEAR = "//*[@class='asf_header']//*[contains(text(),'clear')]"
+XP_CHART_ACTION_DELETE = "//*[@id='chart_action_82']"
+XP_COZEVA_PROMPT = "//*[contains(@class,'cozeva-prompt')]"
+XP_TASK_DELETE_INPUT = "//*[@id='task_delete_input']"
+XP_PROMPT_CONFIRM = "//*[@data-index='confirm']"
+
+# --- CSS selectors (non-XPath) ---
+CSS_FILTER_INDICATOR = "div.filter-indicator"
+CSS_FILTER_CLOSE = "span.mdi-close"
+CLASS_AJAX_PRELOADER = "ajax_preloader"
+CLASS_DRUPAL_MSG = "drupal_message_text"
+
+
+# =============================================================================
+# CONFIG / PATHS
+# =============================================================================
+
+LOGIN_URL = "https://www.cozeva.com/user/login"
+LOGOUT_URL = "https://www.cozeva.com/user/logout"
+BASE_URL = "https://www.cozeva.com/"
+
+REPORT_DIR = r"C:\Users\SumanBasu\Automation\Report\\"
+CSV_DOWNLOAD_DIR = r"C:\Users\SumanBasu\Automation\CSV_Files"
+CHROME_USER_DATA = (
+    r"C:\Users\SumanBasu\AppData\Local\Google\Chrome\User Data\DefaultAutomation2"
+)
+CHROMEDRIVER_PATH = r"C:\Users\SumanBasu\Downloads\RTVS_dist\assets\chromedriver.exe"
+
+# Redmine ticket used on "last access" reason prompt
+LAST_ACCESS_REASON = "https://redmine2.cozeva.com/issues/48191"
+MEASURE_YEAR = "2026"
+
+# Excel fill colors
+FILL_HEADER = "D9E1F2"
+FILL_PASS = "C6EFCE"   # green
+FILL_FAIL = "F4CCCC"   # red
+FILL_NA = "FFFFCC"     # yellow
+
+# Status keywords that drive conditional formatting
+PASS_VALUES = ("MATCHED",)
+FAIL_VALUES = ("NO MATCHED", "NOT MATCHED", "discrepancy")
+NA_VALUES = ("NA",)
+PASS_CONTAINS = ("successfully validated", "available")
+
+
+# =============================================================================
+# UI LAUNCH  (blocks until user submits or cancels)
+# =============================================================================
+
+result = launch_measure_selector()
+if result is None:
+    print("Measure selector cancelled. Exiting.")
+    sys.exit(0)
+
+measure_abb = result["abbrev"]
+lob_cust_mapping = result["lob_customer_mapping"]
+print(f"Selected measure: {measure_abb} | LOBs: {len(lob_cust_mapping)}")
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def ajax_preloader_wait(driver, timeout=300):
+    """Wait until ajax preloaders and Drupal flash messages are gone."""
+    time.sleep(1)
+    WebDriverWait(driver, timeout).until(
+        EC.invisibility_of_element((By.CLASS_NAME, CLASS_AJAX_PRELOADER))
+    )
+    if driver.find_elements(By.CLASS_NAME, CLASS_AJAX_PRELOADER):
+        WebDriverWait(driver, timeout).until(
+            EC.invisibility_of_element((By.CLASS_NAME, CLASS_AJAX_PRELOADER))
+        )
+    WebDriverWait(driver, timeout).until(
+        EC.invisibility_of_element((By.CLASS_NAME, CLASS_DRUPAL_MSG))
+    )
+    time.sleep(1)
+
+
+def wait_datatable(driver, timeout=30):
+    """Wait for DataTables info footer (page ready signal)."""
+    WebDriverWait(driver, timeout).until(
+        EC.visibility_of_element_located((By.XPATH, XP_DATATABLES_INFO))
+    )
+
+
+def normalize(text):
+    """Strip year ranges and normalize whitespace/case for fuzzy compare."""
+    text = re.sub(r"\d+[-–]\d+", "", text)
+    return " ".join(text.lower().split())
+
+
+def get_status(searched_value, returned_result_array):
+    """Return MATCHED if searched code appears in any returned suggestion."""
+    if not searched_value or not returned_result_array:
+        return "Empty Result Set"
+
+    needle = str(searched_value).strip().lower()
+    for item in returned_result_array:
+        if needle in str(item).strip().lower():
+            return "MATCHED"
+    return "NO MATCHED"
+
+
+def compare_flags(mspl_flag, dash_flag):
+    """Compare MSPL vs Dashboard boolean flags → MATCHED / NOT MATCHED / NA."""
+    if mspl_flag == 0 and dash_flag == 0:
+        return "NA"
+    if mspl_flag == dash_flag:
+        return "MATCHED"
+    return "NOT MATCHED"
+
+
+def url_navigator(cust_id, base_url, main_url):
+    """Rebuild registries URL with target customer id baked into session token."""
+    parsed_url = urlparse(main_url)
+    query_parameters = parse_qs(parsed_url.query)
+    session_id = query_parameters.get("session", [None])[0]
+    if not session_id:
+        raise ValueError("No session parameter found in registry URL")
+
+    decoded_val = base64.b64decode(session_id).decode("utf-8")
+    # Session payload is anchored on customer 1500; swap in the target cust_id
+    temp = decoded_val.replace("1500", str(cust_id))
+    new_session = base64.b64encode(temp.encode("utf-8")).decode("utf-8")
+    return f"{base_url}registries?session={new_session}"
+
+
+def _cell_status_fill(value):
+    """Pick a fill color based on cell text, or None if no rule matches."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    text_lower = text.lower()
+
+    if text in PASS_VALUES or any(p in text_lower for p in PASS_CONTAINS):
+        return PatternFill("solid", fgColor=FILL_PASS)
+    if text in FAIL_VALUES or any(f in text_lower for f in FAIL_VALUES):
+        return PatternFill("solid", fgColor=FILL_FAIL)
+    if text in NA_VALUES:
+        return PatternFill("solid", fgColor=FILL_NA)
+    return None
+
+
+def format_excel_sheet(ws, wrap_columns=None, status_columns=None):
+    """
+    Apply header style, freeze pane, wrap selected columns, and color status cells.
+
+    wrap_columns / status_columns: 1-based column index lists.
+    Defaults apply wrap to common result columns and scan all cells for status colors
+    so Navigation / MSPL / Code Search sheets all format correctly.
+    """
+    header_fill = PatternFill("solid", fgColor=FILL_HEADER)
+    header_font = Font(bold=True)
+    center_align = Alignment(vertical="center", wrap_text=True, horizontal="left")
+
+    max_col = ws.max_column
+    max_row = ws.max_row
+
+    for col in range(1, max_col + 1):
+        cell = ws.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+        ws.column_dimensions[get_column_letter(col)].width = 28
+
+    # Default wrap columns: longer text fields (criteria, codes, comments, options)
+    if wrap_columns is None:
+        wrap_columns = [4, 5, 6, 7]
+
+    for col in wrap_columns:
+        if col <= max_col:
+            for row in range(2, max_row + 1):
+                ws.cell(row=row, column=col).alignment = Alignment(
+                    wrap_text=True, vertical="top"
+                )
+
+    ws.freeze_panes = "A2"
+
+    # Color status-like cells: either specific columns, or every data cell
+    cols_to_scan = status_columns if status_columns else range(1, max_col + 1)
+    for row in range(2, max_row + 1):
+        for col in cols_to_scan:
+            cell = ws.cell(row=row, column=col)
+            fill = _cell_status_fill(cell.value)
+            if fill:
+                cell.fill = fill
+
+
+def extract_code_list(populated_list):
+    """
+    Parse code <li> elements into (id_value_pairs, display_lines).
+    id_value_pairs is a flat [id, tooltip, id, tooltip, ...] list (legacy shape).
+    """
+    code_id_value_list = []
+    result_list = []
+    for element in populated_list:
+        div = element.find_element(By.TAG_NAME, "div")
+        code_id = (div.get_attribute("id") or "").split("|")[0]
+        code_value = div.get_attribute("data-tooltip")
+        code_id_value_list.extend([code_id, code_value])
+        result_list.append(f"{code_id} | {code_value}")
+    return code_id_value_list, result_list
+
+
+# =============================================================================
+# PAGE ACTIONS
+# =============================================================================
+
+def measure_search_registry(driver, measure, abb=None):
+    """Open registry measure filters and search by full measure name."""
+    driver.find_element(By.XPATH, XP_REG_FILTER_TOGGLE).click()
+    time.sleep(0.5)
+    driver.find_element(By.XPATH, XP_REG_FILTER_FIRST_LABEL).click()
+    time.sleep(0.5)
+    driver.find_element(By.XPATH, XP_REG_SEARCH_INPUT).send_keys(measure)
+    apply_btn = driver.find_element(By.XPATH, XP_REG_APPLY_SEARCH)
+    driver.execute_script("arguments[0].scrollIntoView();", apply_btn)
+    apply_btn.click()
+    time.sleep(0.5)
+
+
+def measure_patient_finder(driver, customer, lob, measure_name, measure_abb,
+                           domain_name, ws, wb):
+    """
+    Open measure → MSPL → first patient dashboard.
+    Validates domain/name, pencil options, MAP, and MSPL↔Dashboard alignment.
+    Returns 1 if supplemental data is available (code check should run), else 0.
+    """
+    name_check = "NA"
+    domain_check = "NA"
+    pencil_check = "NA"
+    pencil_icon_details = "NA"
+    perf_check = "NA"
+    network_check = "NA"
+    dashboard_map_check = "NA"
+    dashboard_pencil_check = "NA"
+    patient_link = "NA"
+    comments = "NA"
+    mspl_map_flag = 0
+    mspl_supp_flag = 0
+    dash_map_flag = 0
+    dash_supp_flag = 0
+    compliancy_details = "NA"
+    mspl_link = ""
+
+    try:
+        # Resolve measure link (handle apostrophes in measure names)
+        try:
+            measure_link = driver.find_element(
+                By.XPATH, xp_measure_link_by_name(measure_name)
+            ).get_attribute("href")
+        except Exception:
+            # e.g. "Member's ..." → search on text after the apostrophe
+            modified_text = measure_name.split("'", 1)[1]
+            measure_link = driver.find_element(
+                By.XPATH, xp_measure_link_by_span(modified_text)
+            ).get_attribute("href")
+
+        driver.get(measure_link)
+        ajax_preloader_wait(driver)
+        wait_datatable(driver)
+
+        # Domain | Measure title on MSPL header
+        measure_fullname = driver.find_element(By.XPATH, XP_MSPL_TITLE).text
+        parts = measure_fullname.split("|")
+        measure_domain_ui = parts[0].strip() if len(parts) > 0 else ""
+        measure_name_ui = parts[1].strip() if len(parts) > 1 else ""
+
+        print(f"Sheet domain: {domain_name} | UI domain: {measure_domain_ui}")
+        name_check = (
+            "Measure name successfully validated"
+            if measure_name in measure_name_ui
+            else "Measure name discrepancy found"
+        )
+        domain_check = (
+            "Domain name successfully validated"
+            if domain_name in measure_domain_ui
+            else "Domain name discrepancy found"
+        )
+
+        try:
+            # First provider's patient-list link
+            elems = driver.find_element(
+                By.XPATH, XP_PROVIDER_FIRST_LINK_CELL
+            ).find_elements(By.TAG_NAME, "a")
+            mspl_link = elems[0].get_attribute("href")
+            driver.get(mspl_link)
+            print("Opening MSPL...")
+            ajax_preloader_wait(driver)
+            wait_datatable(driver)
+
+            rows = (
+                driver.find_element(By.XPATH, XP_QUALITY_REGISTRY_LIST)
+                .find_element(By.TAG_NAME, "tbody")
+                .find_elements(By.TAG_NAME, "tr")
+            )
+
+            # If a filter tag blocks the table, close it and retry
+            try:
+                patient_link = rows[0].find_element(
+                    By.XPATH, XP_PAT_NAME
+                ).get_attribute("href")
+            except Exception:
+                driver.find_element(By.XPATH, XP_DT_TAG_CLOSE).click()
+                ajax_preloader_wait(driver)
+                wait_datatable(driver)
+                rows = (
+                    driver.find_element(By.XPATH, XP_QUALITY_REGISTRY_LIST)
+                    .find_element(By.TAG_NAME, "tbody")
+                    .find_elements(By.TAG_NAME, "tr")
+                )
+                patient_link = rows[0].find_element(
+                    By.XPATH, XP_PAT_NAME
+                ).get_attribute("href")
+
+            tab_param = driver.find_element(
+                By.XPATH, XP_QUALITY_REGISTRY_TABS
+            ).find_elements(By.TAG_NAME, "li")
+            if len(tab_param) > 2:
+                perf_check = tab_param[1].text
+                network_check = tab_param[2].text
+
+            # Pencil / supplemental-data menu on first patient row
+            try:
+                print("Checking pencil icon availability...")
+                rows[0].find_element(By.XPATH, XP_ADD_SUPP_TRIGGER).click()
+                time.sleep(3)
+                menu_items = rows[0].find_element(
+                    By.XPATH, XP_ADD_SUPP_MENU
+                ).find_elements(By.TAG_NAME, "li")
+                pencil_check = "Pencil icon available"
+                pencil_icon_details = ", ".join(d.text for d in menu_items)
+            except Exception:
+                pencil_check = "Pencil icon not available"
+                pencil_icon_details = "Not applicable"
+
+        except NoSuchElementException:
+            print("No Providers Found, skipping check")
+            comments = "No Providers Found for the measure"
+            pencil_icon_details = "NA"
+            patient_link = "NA"
+
+    except Exception as e:
+        print(f"Error in measure_patient_finder: {e}")
+        traceback.print_exc()
+
+    # --- Patient dashboard checks ---
+    if patient_link == "NA":
+        print("Skipping dashboard check (no patient link)...")
+    else:
+        driver.get(patient_link)
+        ajax_preloader_wait(driver)
+        measure_name_dashboard = measure_name.replace("'", "")
+
+        try:
+            driver.find_element(By.XPATH, xp_dashboard_pencil(measure_name_dashboard))
+            dashboard_pencil_check = "Pencil icon available"
+            dash_supp_flag = 1
+        except NoSuchElementException:
+            dashboard_pencil_check = "Pencil icon not available"
+
+        try:
+            driver.find_element(By.XPATH, xp_dashboard_map(measure_name_dashboard))
+            dashboard_map_check = "MAP checkbox available"
+            dash_map_flag = 1
+        except NoSuchElementException:
+            dashboard_map_check = "MAP checkbox not available"
+
+        try:
+            driver.find_element(By.XPATH, xp_dashboard_non_compliant(measure_name))
+            compliancy_details = "Non-compliant"
+        except NoSuchElementException:
+            compliancy_details = "Compliant"
+
+    # --- Align MSPL pencil options with dashboard ---
+    if "Add Supplemental Data" in pencil_icon_details:
+        mspl_supp_flag = 1
+    else:
+        comments = f"{comments}| No supplemental data, skipping code check"
+
+    if "Mark as Pending" in pencil_icon_details:
+        mspl_map_flag = 1
+
+    mspl_dashboard_map_check = compare_flags(mspl_map_flag, dash_map_flag)
+    mspl_dashboard_pencil_check = compare_flags(mspl_supp_flag, dash_supp_flag)
+
+    # Navigation sheet row
+    ws.append([
+        customer, lob, domain_check, name_check,
+        perf_check, network_check, comments
+    ])
+    format_excel_sheet(
+        ws,
+        wrap_columns=[7],
+        status_columns=[3, 4],
+    )
+
+    # MSPL vs Dashboard sheet row
+    ws_mspl = wb["MSPL vs Dashboard Check"]
+    ws_mspl.append([
+        customer, lob, compliancy_details, pencil_check, pencil_icon_details,
+        dashboard_pencil_check, dashboard_map_check,
+        mspl_dashboard_map_check, mspl_dashboard_pencil_check, mspl_link
+    ])
+    format_excel_sheet(
+        ws_mspl,
+        wrap_columns=[5, 10],
+        status_columns=[3, 4, 6, 7, 8, 9],
+    )
+    return mspl_supp_flag
+
+
+def supplemental_data_launcher(driver):
+    """Open Add Supplemental Data (coding tool) from patient dashboard."""
+    coding_tool_btn = driver.find_element(By.XPATH, XP_ADD_SUPPLEMENTAL_DATA)
+    driver.execute_script(
+        "arguments[0].scrollIntoView({block:'center', inline:'nearest'});",
+        coding_tool_btn,
+    )
+    coding_tool_btn.click()
+    ajax_preloader_wait(driver)
+    WebDriverWait(driver, 30).until(
+        EC.visibility_of_element_located((By.XPATH, XP_TASK_DEF))
+    )
+
+
+def code_search_coding_tool(driver, customer, lob, measure_name, ws):
+    """
+    Match the target metric, then for each criteria option:
+      - click every advanced-search button present for that criteria
+      - populate codes, search the first code id, record MATCHED / NO MATCHED
+    """
+    cz_id = driver.find_element(By.XPATH, XP_PATIENT_COZEVA_ID).text
+    time.sleep(2)
+
+    metric_rows = driver.find_elements(By.XPATH, XP_METRIC_ROWS)
+    target_metric = None
+
+    # --- Locate metric by name (relative XPath scoped to each row) ---
+    try:
+        print("Finding matching metric...")
+        for metric in metric_rows:
+            try:
+                metric_name = metric.find_element(
+                    By.XPATH, XP_MET_NAME_REL
+                ).text.strip()
+                if measure_name == metric_name:
+                    target_metric = metric
+                    print(f"Matched metric: {metric_name}")
+                    driver.execute_script(
+                        "arguments[0].scrollIntoView({block:'center'});",
+                        target_metric,
+                    )
+                    driver.find_element(By.XPATH, XP_RIGHT_PANEL_FIRST_TAB).click()
+                    time.sleep(1)
+                    target_metric.find_element(By.XPATH, XP_ADD_MORE_REL).click()
+                    time.sleep(2)
+                    break
+            except Exception as inner_e:
+                print(f"Skipping metric due to error: {inner_e}")
+    except Exception as e:
+        print(f"Error occurred at metric match: {e}")
+        return
+
+    if not target_metric:
+        print("Target metric not found")
+        return
+
+    # --- Criteria loop ---
+    choices = driver.find_elements(By.XPATH, XP_CHOICE_OPTIONS_LI)
+    print("Executing code search...")
+
+    for i in range(len(choices)):
+        driver.find_element(By.XPATH, XP_CHOICE_SELECT_WRAPPER).click()
+        time.sleep(2)
+        # Re-query after dropdown re-render
+        choices = driver.find_elements(By.XPATH, XP_CHOICE_OPTIONS_LI)
+        criteria = choices[i].text
+        print(f"Checking Criteria {i + 1}: {criteria}")
+        choices[i].click()
+        time.sleep(3)
+
+        try:
+            # All advanced-search buttons for this criteria (multi-code-set support)
+            adv_buttons = driver.find_elements(By.XPATH, XP_ADVANCED_SEARCH_BTN)
+            if not adv_buttons:
+                raise NoSuchElementException("No advanced search buttons found")
+
+            print(f"Found {len(adv_buttons)} advanced search button(s)")
+            for btn in adv_buttons:
+                btn.click()
+                populated_list = driver.find_elements(By.XPATH, XP_CODE_UL_LI)
+
+                try:
+                    code_id_value_list, result_lines = extract_code_list(
+                        populated_list
+                    )
+                    result_list = "\n ".join(result_lines)
+
+                    # Search using the first populated code id
+                    search_input = driver.find_element(
+                        By.ID, "advanced_code_search_input"
+                    )
+                    search_input.clear()
+                    search_input.send_keys(code_id_value_list[0])
+                    time.sleep(5)
+
+                    populated_list = driver.find_elements(By.XPATH, XP_CODE_UL_LI)
+                    search_results = []
+                    try:
+                        _, search_results = extract_code_list(populated_list)
+                        populated_result = "\n ".join(search_results)
+                    except NoSuchElementException:
+                        populated_result = (
+                            "No Suggestions found for the searched code: "
+                            + str(code_id_value_list[0])
+                        )
+
+                    status = get_status(code_id_value_list[0], search_results)
+                    try:
+                        print("\n ".join(search_results))
+                        # Report the code that was searched
+                        populated_result = (
+                            f"{code_id_value_list[0]} | {code_id_value_list[1]}"
+                        )
+                    except (TypeError, IndexError):
+                        populated_result = (
+                            "Check the result. At least one item empty."
+                        )
+
+                except NoSuchElementException:
+                    result_list = "No suggestions found"
+                    populated_result = "NA"
+                    status = "NA"
+
+                ws.append([
+                    customer, lob, cz_id, measure_name, criteria,
+                    result_list, populated_result, status,
+                ])
+                format_excel_sheet(ws, wrap_columns=[6, 7], status_columns=[8])
+
+                driver.find_element(By.XPATH, XP_ASF_CLEAR).click()
+                time.sleep(1)
+
+        except Exception as e:
+            print(e)
+            print("No codes to populate...")
+            ws.append([
+                customer, lob, cz_id, measure_name, criteria,
+                "No codes for criteria", "NA", "NA",
+            ])
+            format_excel_sheet(ws, wrap_columns=[6, 7], status_columns=[8])
+            continue
+
+        time.sleep(1)
+
+
+def close_coding_tool(driver):
+    """Discard the coding-tool task after code search completes."""
+    driver.find_element(By.XPATH, XP_CHART_ACTION_DELETE).click()
+    WebDriverWait(driver, 30).until(
+        EC.visibility_of_element_located((By.XPATH, XP_COZEVA_PROMPT))
+    )
+    time.sleep(1)
+    driver.find_element(By.XPATH, XP_TASK_DELETE_INPUT).send_keys("CozevaQA")
+    driver.find_element(By.XPATH, XP_PROMPT_CONFIRM).click()
+    time.sleep(1)
+    ajax_preloader_wait(driver)
+
+
+def apply_registry_filters(driver, lob, measure_year):
+    """Set MY year + LOB on registries filter panel and apply."""
+    driver.find_element(By.XPATH, XP_QT_FILTER_LABEL).click()
+    time.sleep(1)
+
+    for year in driver.find_element(
+        By.XPATH, XP_FILTER_QUARTER
+    ).find_elements(By.TAG_NAME, "li"):
+        if measure_year in year.text:
+            year.click()
+            break
+
+    for lob_item in driver.find_element(
+        By.XPATH, XP_FILTER_LOB
+    ).find_elements(By.TAG_NAME, "li"):
+        if "All" in lob:
+            if lob in lob_item.text:
+                lob_item.click()
+                break
+        elif lob == lob_item.text:
+            lob_item.click()
+            break
+
+    time.sleep(1)
+    driver.find_element(By.XPATH, XP_REG_FILTER_APPLY).click()
+    ajax_preloader_wait(driver)
+
+
+def ensure_ce_off(driver):
+    """Turn Continuous Enrollment off if currently selected."""
+    if driver.find_element(By.XPATH, XP_CONTI_ENROLL).is_selected():
+        print("CE toggled on, switching off")
+        driver.find_element(By.XPATH, XP_CONT_DISC_TOGGLE).click()
+    else:
+        print("CE Off")
+
+
+def close_active_filter_indicator(driver):
+    """Close pre-applied filter chip on registry if present."""
+    try:
+        filter_indicator = WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, CSS_FILTER_INDICATOR))
+        )
+        filter_indicator.find_element(By.CSS_SELECTOR, CSS_FILTER_CLOSE).click()
+        print("Filter was applied..Closing it")
+    except Exception:
+        print("No active filter indicator found")
+
+
+# =============================================================================
+# WORKBOOK SETUP
+# =============================================================================
+
+User = os.environ.get("CS2_User")
+Pass = os.environ.get("CS2_Password")
+
+os.makedirs(REPORT_DIR, exist_ok=True)
+
+name_date = datetime.datetime.now()
+formatted_date = name_date.strftime("%y-%m-%d %H-%M")
+filename = f"{measure_abb} validation_{formatted_date}.xlsx"
+report_path = os.path.join(REPORT_DIR, filename)
+
+wb = Workbook()
+
+# Sheet 1 – Navigation / domain & score checks
+ws = wb.active
+sheet_name = f"{measure_abb} Navigation"
+ws.title = sheet_name
+ws.append([
+    "Customer Name",
+    "LOB",
+    "Domain Name Check",
+    "Measure Name Check",
+    "Performance Statistics Score",
+    "Network Comparison Score",
+    "Comments",
+])
+format_excel_sheet(ws, wrap_columns=[7], status_columns=[3, 4])
+
+# Sheet 2 – MSPL vs Patient Dashboard alignment
+ws = wb.create_sheet("MSPL vs Dashboard Check")
+ws.append([
+    "Customer Name",
+    "LOB Name",
+    "Patient Compliance Status",
+    "MSPL Pencil Icon Present",
+    "MSPL Pencil Icon Options",
+    "Dashboard Pencil Icon Present",
+    "MAP Checkbox Present in Dashboard",
+    "MSPL vs Dashboard MAP Alignment",
+    "MSPL vs Dashboard Pencil Alignment",
+    "MSPL Link",
+])
+format_excel_sheet(ws, wrap_columns=[5, 10], status_columns=[3, 4, 6, 7, 8, 9])
+
+# Sheet 3 – Coding tool code search
+ws = wb.create_sheet("Code Search Validation")
+ws.append([
+    "Customer",
+    "LOB Name",
+    "Cozeva ID",
+    "Measure Name",
+    "Criteria Name",
+    "Populated Codes",
+    "Search Result (Code Queried)",
+    "Result Matched",
+])
+format_excel_sheet(ws, wrap_columns=[6, 7], status_columns=[8])
+
+
+# =============================================================================
+# BROWSER / LOGIN
+# =============================================================================
+
+options = webdriver.ChromeOptions()
+prefs = {"download.default_directory": CSV_DOWNLOAD_DIR}
+options.add_argument(f"user-data-dir={CHROME_USER_DATA}")
+options.add_argument("--disable-notifications")
+options.add_experimental_option("prefs", prefs)
+
+# executable_path is legacy; keep for current chromedriver setup
+driver = webdriver.Chrome(executable_path=CHROMEDRIVER_PATH, options=options)
+
+driver.get(LOGOUT_URL)
+driver.get(LOGIN_URL)
+driver.maximize_window()
+print(f"Initial window= {driver.title}")
+
+driver.find_element(By.ID, "edit-name").send_keys(User)
+driver.find_element(By.ID, "edit-pass").send_keys(Pass)
+driver.find_element(By.ID, "edit-submit").click()
+time.sleep(1)
+
+# Optional "last access reason" gate
+try:
+    WebDriverWait(driver, 90).until(
+        EC.presence_of_element_located((By.ID, "reason_textbox"))
+    )
+    driver.find_element(By.ID, "reason_textbox").send_keys(LAST_ACCESS_REASON)
+    driver.find_element(By.ID, "edit-submit").click()
+except (NoSuchElementException, TimeoutException):
+    # Page may already be past the reason prompt
+    pass
+
+print(f"Landing page= {driver.title}")
+ajax_preloader_wait(driver)
+
+# Navigate into Registries if not already there
+if driver.title != "Registries | Cozeva":
+    driver.find_element(By.XPATH, XP_APP_DROPDOWN).click()
+    driver.find_element(By.XPATH, XP_APP_REGISTRIES).click()
+    driver.switch_to.window(driver.window_handles[1])
+
+ajax_preloader_wait(driver)
+registry_url = driver.current_url
+print(f"Starting validation of measure: {measure_abb}")
+
+
+# =============================================================================
+# MAIN LOOP – one pass per selected customer/LOB
+# =============================================================================
+
+for record in lob_cust_mapping:
+    lob = record["lob"]
+    customer_name = record["customer"]
+    customer_id = record["customer_id"]
+    measure_domain = record["domain"]
+    measure_name = record["measure"]
+
+    print(
+        f"Checking {measure_abb} for {customer_name} in {lob} "
+        f"(MY{MEASURE_YEAR})"
+    )
+
+    link = url_navigator(customer_id, BASE_URL, registry_url)
+    driver.get(link)
+    ajax_preloader_wait(driver)
+
+    apply_registry_filters(driver, lob, MEASURE_YEAR)
+    ensure_ce_off(driver)
+    close_active_filter_indicator(driver)
+
+    ws = wb[sheet_name]
+    try:
+        measure_search_registry(driver, measure_name, measure_abb)
+        code_check_flag = measure_patient_finder(
+            driver, customer_name, lob, measure_name, measure_abb,
+            measure_domain, ws, wb
+        )
+        wb.save(report_path)
+
+        if code_check_flag == 1:
+            print("Supplemental data available — running code search...")
+            supplemental_data_launcher(driver)
+            ws_code = wb["Code Search Validation"]
+            code_search_coding_tool(
+                driver, customer_name, lob, measure_name, ws_code
+            )
+            wb.save(report_path)
+            close_coding_tool(driver)
+        else:
+            print("No pencil / supplemental data — skipping to next LOB")
+
+    except Exception as e:
+        print(f"Error in main block for {customer_name}/{lob}: {e}")
+        traceback.print_exc()
+        wb.save(report_path)
+
+print(f"Report saved: {report_path}")
+driver.quit()
+
