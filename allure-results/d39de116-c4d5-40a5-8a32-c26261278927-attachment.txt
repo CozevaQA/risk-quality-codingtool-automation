@@ -1,6 +1,0 @@
-
-        Save Status    : True
-        Icon Text      : check
-        Autosave Text  : check  Autosave: 5/26/2026 12:27:05 PM
-        Autosave Time  : 5/26/2026 12:27:05 PM
-        
