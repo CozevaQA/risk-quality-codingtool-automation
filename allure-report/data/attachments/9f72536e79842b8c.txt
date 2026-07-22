@@ -1,0 +1,3 @@
+Initial HCC count: 8
+HCC count after ALL HCC toggle: 8
+Additional HCCs displayed: 0

@@ -1,0 +1,97 @@
+[PASS] M06.9 → Description matched
+
+[PASS] M06.9 → HCC ID matched (93)
+
+[PASS] M06.9 → HCC Description matched
+
+[PASS] M06.9 → Last DOS format valid (01/30/2024)
+
+[PASS] G83.4 → Description matched
+
+[PASS] G83.4 → HCC ID matched (182)
+
+[PASS] G83.4 → HCC Description matched
+
+[PASS] G83.4 → Last DOS format valid (01/30/2024)
+
+[PASS] I50.30 → Description matched
+
+[PASS] I50.30 → HCC ID matched (226)
+
+[PASS] I50.30 → HCC Description matched
+
+[PASS] I50.30 → Last DOS format valid (11/19/2024)
+
+[PASS] I50.20 → Description matched
+
+[PASS] I50.20 → HCC ID matched (226)
+
+[PASS] I50.20 → HCC Description matched
+
+[PASS] I50.20 → Last DOS format valid (01/30/2024)
+
+[PASS] I50.22 → Description matched
+
+[PASS] I50.22 → HCC ID matched (226)
+
+[PASS] I50.22 → HCC Description matched
+
+[PASS] I50.22 → Last DOS format valid (01/30/2024)
+
+[PASS] I50.9 → Description matched
+
+[PASS] I50.9 → HCC ID matched (226)
+
+[PASS] I50.9 → HCC Description matched
+
+[PASS] I50.9 → Last DOS format valid (01/27/2023)
+
+[PASS] I42.9 → Description matched
+
+[PASS] I42.9 → HCC ID matched (227)
+
+[PASS] I42.9 → HCC Description matched
+
+[PASS] I42.9 → Last DOS format valid (01/30/2024)
+
+[PASS] F03.90 → Description matched
+
+[PASS] F03.90 → HCC ID matched (127)
+
+[PASS] F03.90 → HCC Description matched
+
+[PASS] F03.90 → Last DOS format valid (01/30/2024)
+
+[PASS] J44.9 → Description matched
+
+[PASS] J44.9 → HCC ID matched (280)
+
+[PASS] J44.9 → HCC Description matched
+
+[PASS] J44.9 → Last DOS format valid (01/30/2024)
+
+[PASS] J84.10 → Description matched
+
+[PASS] J84.10 → HCC ID matched (280)
+
+[PASS] J84.10 → HCC Description matched
+
+[PASS] J84.10 → Last DOS format valid (01/30/2024)
+
+[PASS] F33.1 → Description matched
+
+[PASS] F33.1 → HCC ID matched (155)
+
+[PASS] F33.1 → HCC Description matched
+
+[PASS] F33.1 → Last DOS format valid (01/30/2024)
+
+[PASS] I69.334 → Description matched
+
+[PASS] I69.334 → HCC ID matched (254)
+
+[FAIL] I69.334 → HCC Description mismatch
+Expected: Monoplegia, Other Paralytic Syndromes
+Actual:   Monoplegia, Other ParalyticSyndromes
+
+[PASS] I69.334 → Last DOS format valid (07/12/2022)

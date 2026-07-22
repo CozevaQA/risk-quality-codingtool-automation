@@ -1,0 +1,6 @@
+
+        DX Code: G83.4
+        Disconfirm Tag Text: HCC Disconfirmed
+        Undo Disconfirm Text: Undo Disconfirm
+        Red Dot Status: no dot
+        

@@ -1,0 +1,1 @@
+[['CPT/HCPCS', '99202', 'Office or other outpatient visit for the evaluation and management of a new patient, which requires a medically appropriate history and/or examination and straightforward medical decision making. When using total time on the date of the encounter for code selection, 15 minutes must be met or exceeded.']]

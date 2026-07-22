@@ -1,2 +1,167 @@
 "DESCRIPTION","DURATION IN MS","NAME","PARENT SUITE","START TIME","STATUS","STOP TIME","SUB SUITE","SUITE","TEST CLASS","TEST METHOD"
-"","21945","test_poc_launch","tests.smoke","2025-12-09","passed","2025-12-09","","test_dummy","",""
+"
+Verifies that:
+- File can be uploaded
+- Toast message appears
+- Uploaded document name is displayed
+- Add Document button becomes available
+","10327","test_file_upload_functionality","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Verify that an HCC-mapped DX code can be added globally
+and its HCC name and number are displayed correctly.
+","10294","test_add_dx_global_with_hcc","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Validate that the task created during POC submission
+can be successfully deleted using the Risk Coding Tool.
+
+This test_risk_poc ensures that:
+- The task link generated after submission is accessible
+- The delete action completes successfully
+- A successful deletion response is returned
+- User notification is triggered only after success
+","868","test_document_deleted","test_risk_poc","2026-05-26","passed","2026-05-26","","test_05_coding_tool","",""
+"
+Validate that a document deleted via the Risk Coding Tool
+is no longer visible in the Patient Dashboard document list.
+
+This test_risk_poc ensures that:
+- The patient document list can be retrieved successfully
+- The document deleted earlier does not appear in the list
+- UI state reflects backend deletion accurately
+","20791","test_deleted_document_not_in_documents","test_risk_poc","2026-05-26","passed","2026-05-26","","test_05_coding_tool","",""
+"
+Test Objective:
+Verify that clicking 'Save Draft' triggers autosave functionality and
+displays:
+1. A success status
+2. A green check icon
+3. Autosave confirmation text
+4. Autosave timestamp in expected UI format
+","4244","test_savedraft_feature","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Verify that an CPT can be added and number and description are displayed correctly.
+","10721","test_add_cpt","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Pre-Requisite : Show All Dx should be clicked
+Verifies Disconfirm behavior for a Recapture DX:
+- Not Addressed is performed on a recaptured DX
+- 'HCC Not Addressed ' tag appears
+- 'Undo Not Addressed ' action is available
+","0","test_not_addressed","test_risk_poc","2026-05-26","broken","2026-05-26","","test_03_form_actions","",""
+"","142","test_notes_info","test_risk_poc","2026-05-26","passed","2026-05-26","","test_05_coding_tool","",""
+"
+Validate that the Risk label is displayed on the POC page and
+that the Risk count matches Patient Dashboard.
+","88","test_risk_label_and_count","test_risk_poc","2026-05-26","passed","2026-05-26","","test_01_poc_launch","",""
+"","128","test_submitted_dx","test_risk_poc","2026-05-26","passed","2026-05-26","","test_05_coding_tool","",""
+"","72","test_submitted_hcc","test_risk_poc","2026-05-26","passed","2026-05-26","","test_05_coding_tool","",""
+"
+Pre-Requisite : Show All Dx should be clicked
+Verifies Disconfirm behavior for a Recapture DX:
+- Disconfirm action is performed on a recaptured DX
+- 'HCC Disconfirmed' tag appears
+- 'Undo Disconfirm' action is available
+","4","test_disconfirm","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Verify that a NON-HCC DX code can be added globally
+and its description matches the expected value.
+","10293","test_add_dx_global_non_hcc","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Validate that all disconfirmed HCC codes from POC submission
+are correctly reflected as stale HCC on the Patient Dashboard.
+
+
+","71","test_disconfirmed_hcc_processed_to_stale","test_risk_poc","2026-05-26","passed","2026-05-26","","test_04_patient_dashboard","",""
+"
+Validate that submitting POC without required fields
+shows validation toast.
+","1","test_invalid_poc_submission_missing_dos_or_provider","test_risk_poc","2026-05-26","passed","2026-05-26","","test_01_poc_launch","",""
+"
+Verifies that enabling the ALL HCC toggle renders additional
+HCCs in the POC form when compliant HCCs are available.
+","2311","test_all_hcc","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Validate that DX codes displayed on the Risk POC page are correctly
+populated with their corresponding HCC details and metadata.
+","1118","test_dx_hcc_population","test_risk_poc","2026-05-26","failed","2026-05-26","","test_02_dx_hcc_population","",""
+"
+Validate that all confirmed HCC codes from POC submission
+are correctly reflected with hollow dot HCC on the Patient Dashboard.
+
+
+","14","test_confirmed_hcc_processed_to_hollow","test_risk_poc","2026-05-26","failed","2026-05-26","","test_04_patient_dashboard","",""
+"
+Validate that the Risk POC page launches successfully and
+displays the correct list of non-compliant DX codes
+as shown on the Patient Dashboard.
+","279","test_poc_launch","test_risk_poc","2026-05-26","passed","2026-05-26","","test_01_poc_launch","",""
+"
+Validate that all confirmed HCC codes from POC submission
+are correctly reflected as stale HCC on the Patient Dashboard.
+
+
+","36","test_confirmed_hcc_processed_to_stale","test_risk_poc","2026-05-26","passed","2026-05-26","","test_04_patient_dashboard","",""
+"","54","test_encounter_info","test_risk_poc","2026-05-26","failed","2026-05-26","","test_05_coding_tool","",""
+"
+Validate that after a Recapture DX is confirmed on the Risk POC page,
+the Disconfirm and Not Addressed action buttons for that DX
+become disabled.
+
+This test_risk_poc ensures that once a Recapture action is completed:
+- The Disconfirm button is no longer actionable
+- The Not Addressed button is no longer actionable
+
+If no eligible Recapture DX is available, the test_risk_poc is skipped.
+","39","test_buttons_disabled_after_recapture_confirm","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Validate that all core UI elements on the Risk POC page
+are present and visible.
+","351","test_poc_page_ui_elements","test_risk_poc","2026-05-26","passed","2026-05-26","","test_01_poc_launch","",""
+"
+Verifies Rendering Provider field behavior:
+- User can search for a rendering provider by name
+- Provider search dropdown displays matching results
+- At least one provider result is returned for a valid search
+","4736","test_rendering_provider_field","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Verifies that the Suspect Reason modal opens successfully
+and displays non-empty header and content information
+when a suspect reason is available on the POC page.
+","2285","test_view_suspect_reason","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Validate that a task link is generated and available
+after successful POC submission.
+
+This test_risk_poc verifies that:
+- The submission notification contains task-related information
+- A valid task link is present in the submission context
+","5194","test_poc_task_link","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Verifies that HCC hierarchies are visible on the POC page.
+","75","test_poc_hierarchies_visibility","test_risk_poc","2026-05-26","passed","2026-05-26","","test_01_poc_launch","",""
+"
+Verifies Date of Service (DOS) field behavior:
+- Clicking DOS opens the date picker
+- Only the current year (2025) is enabled
+- Past and future years are disabled
+","6428","test_dos_field","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Validate that all confirmed HCC codes from POC submission
+are correctly reflected with hollow dot HCC on the Patient Dashboard.
+
+
+","216","test_disconfirmed_hcc_processed_to_no_dot","test_risk_poc","2026-05-26","passed","2026-05-26","","test_04_patient_dashboard","",""
+"
+Validate that a successful POC submission displays the expected
+confirmation notification message to the user.
+
+This test_risk_poc ensures that after submitting the POC:
+- A submission notification is generated
+- The notification text confirms successful submission
+- The full submission context is captured and attached for traceability
+","5","test_poc_submission_notification","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"
+Verifies kebab menu options for Print actions.
+","3227","test_kebab_menu_print_options","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"","7021","test_add_note","test_risk_poc","2026-05-26","passed","2026-05-26","","test_03_form_actions","",""
+"Verifies whether document name is displayed correctly and document panel shows up","49","test_document_displayed","test_risk_poc","2026-05-26","passed","2026-05-26","","test_05_coding_tool","",""

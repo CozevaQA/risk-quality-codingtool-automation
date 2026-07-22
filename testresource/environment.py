@@ -4,7 +4,7 @@ LOGIN_URL = "https://cert.cozeva.com/user/login"
 USERNAME="c3NyaXZhc3RhdmEuY3M="
 PASSWORD="NUBydmFkQTIwMjM="
 CHROME_PROFILE=r"C:\\chromeprofile"
-REASON="POC Verification <RM>"
+REASON="POC Verification https://redmine2.cozeva.com/issues/30022"
 
 #xpath
 reason_textbox="//textarea[@id=\"reason_textbox\"]"

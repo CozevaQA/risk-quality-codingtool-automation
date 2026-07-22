@@ -1,0 +1,30 @@
+{
+  "notification": "Your changes have been successfully submitted. A new task (Task #26753892) has been created.",
+  "notification_text": "Your changes have been successfully submitted. A new task (Task #26753892) has been created.",
+  "task_text": "(Task #26753892)",
+  "task_link": "https://cert.cozeva.com/patient_detail/2XX5XWG?form_id=26753892&form_type=54&tab_type=chart_review&session=YXBwX2lkPXJlZ2lzdHJpZXMmY3VzdElkPTE1MDAmZG9jdG9yc1BlcnNvbklkPTk2MjgzMzYmZG9jdG9yX3VpZD05NjA4MjQ3JnBheWVySWQ9MTUwMCZwVWlkPTUzNDQ1JnF1YXJ0ZXI9MjAyNS0xMi0zMSZob21lPVlYQndYMmxrUFhKbFoybHpkSEpwWlhNbVkzVnpkRWxrUFRFMU1EQW1jR0Y1WlhKSlpEMHhOVEF3Sm05eVowbGtQVEUxTURBJmZpbHRlcl9vcmdfaWQ9MTUwMA%3D%3D&quarter=2025-01-01%7C2025-12-31%7C0",
+  "confirm_modal_appeared": false,
+  "confirmed_hccs": [
+    "279(V28)",
+    "93(V28)"
+  ],
+  "confirmed_dxs": [
+    "J4550",
+    "M069",
+    "A202"
+  ],
+  "disconfirmed_hccs": [
+    "182(V28)"
+  ],
+  "date_of_service": "12/31/2025",
+  "rendering_provider": "DE LEON, md MARIA, L (1285775437) Primary Care Physician",
+  "document_name": [
+    "Chart_PDF - Copy.pdf"
+  ],
+  "cpt_codes": [
+    "99202"
+  ],
+  "not_addressed_hcc_list": [
+    "226(V28)"
+  ]
+}
